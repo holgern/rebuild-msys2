@@ -51,6 +51,7 @@ _list_changes() {
     _as_list "${list_name}" "${filter}" "${strip}" "$(git log "${git_options[@]}" HEAD^.. | sort -u)"
 }
 
+
 # Get package information
 _package_info() {
     local package="${1}"
@@ -58,7 +59,7 @@ _package_info() {
     for property in "${properties[@]}"; do
         local -n nameref_property="${property}"
         nameref_property=($(
-            MINGW_PACKAGE_PREFIX='mingw-w64' source "${PKGROOT}/${package}/PKGBUILD"
+            source "${PKGROOT}/${package}/PKGBUILD"
             declare -n nameref_property="${property}"
             echo "${nameref_property[@]}"))
     done
@@ -85,7 +86,6 @@ _build_add_depencies() {
     done
     _package_info "${package}" depends makedepends
     for dependency in "${depends[@]}" "${makedepends[@]}"; do
-		[[ "${dependency}" = "mingw-w64-gcc" ]] && continue
 
 		if [ -d "${dependency}" ]; then 
 			sorted_packages+=("${dependency}")
@@ -104,10 +104,9 @@ _build_add_depencies() {
 # Add depencies package to build after required dependencies
 _build_remove_installed_packages() {
     local package="${1}"
-	local arch="${2}"
 	#message "${1}"
 
-    package_installed "${package}" "${arch}" && sorted_packages+=("${package}")
+    package_installed "${package}"  && sorted_packages+=("${package}")
 }
 
 
@@ -153,16 +152,15 @@ git_config() {
 
 package_installed() {
     local pkg="${1}"
-	local arch="${2}"
 	
     local pkgname provides
     _package_info "${pkg}" pkgname provides
 	base_pkg=$(echo $pkgname| cut -d'-' -f 3-)
 
-	test -n "$(pacman -Qq | grep -x mingw-w64-${arch}-${base_pkg})" && return 1
-	test -n "$(pacman -Qq | grep -x mingw-w64-${arch}-${base_pkg/python/python3})" && return 1
-	test -n "$(pacman -Qq | grep -x mingw-w64-${arch}-${base_pkg/python/python2})" && return 1
-	message "mingw-w64-${arch}-${base_pkg} is not installed on ${arch}"
+	test -n "$(pacman -Qq | grep -x ${base_pkg})" && return 1
+	test -n "$(pacman -Qq | grep -x ${base_pkg/python/python3})" && return 1
+	test -n "$(pacman -Qq | grep -x ${base_pkg/python/python2})" && return 1
+	message "${base_pkg} is not installed on ${arch}"
 	return 0
 }
 

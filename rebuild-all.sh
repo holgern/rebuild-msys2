@@ -39,6 +39,7 @@ readonly RUN_ARGS="$@"
 
 # **************************************************************************
 PKGROOT=${TOP_DIR}
+readonly LOGFILE="logfile.txt"
 BUILD_ARCHITECTURE="x86_64"
 [[ ${MINGW_INSTALLS} == mingw32 ]] && {
 	BUILD_ARCHITECTURE="i686"
@@ -70,149 +71,24 @@ while [[ $# > 0 ]]; do
 	shift
 done
 
+if test -n "$(cat ${LOGFILE} | grep 'finished rebuild_all.sh')"; then
+ rm -rf ${LOGFILE}
+fi
+
+
+echo "start rebuild_all.sh" | adddate >> ${LOGFILE}
+
 message 'Package root' "${PKGROOT}"
 
-
+cd ${PKGROOT}
 packages=()
-#packages+=("gcc")
-
-packages+=("libiconv")
-packages+=("gettext")
-packages+=("ncurses")
-packages+=("bash")
-packages+=("bash-completion")
-packages+=("bzip2")
-packages+=("zlib")
-packages+=("openssl")
-packages+=("findutils")
-packages+=("gmp")
-packages+=("coreutils")
-packages+=("sed")
-packages+=("libtasn1")
-packages+=("libffi")
-packages+=("p11-kit")
-packages+=("readline")
-packages+=("pcre")
-packages+=("grep")
-packages+=("ca-certificates")
-packages+=("catgets")
-packages+=("db")
-packages+=("libcrypt")
-packages+=("msys2-runtime")
-packages+=("make")
-packages+=("ed")
-packages+=("patch")
-packages+=("libedit")
-packages+=("icu")
-packages+=("sqlite")
-packages+=("heimdal")
-packages+=("expat")
-packages+=("xz")
-packages+=("libxml2")
-packages+=("libmetalink")
-packages+=("libssh2")
-packages+=("curl")
-packages+=("filesystem")
-packages+=("dash")
-packages+=("file")
-packages+=("m4")
-packages+=("flex")
-packages+=("mpfr")
-packages+=("gawk")
-packages+=("gnupg")
-packages+=("less")
-packages+=("gzip")
-packages+=("tftp-hpa")
-packages+=("inetutils")
-packages+=("lzo2")
-packages+=("nettle")
-packages+=("libarchive")
-packages+=("libgpg-error")
-packages+=("libassuan")
-packages+=("gpgme")
-packages+=("libidn")
-packages+=("util-linux")
-packages+=("lndir")
-packages+=("mintty")
-packages+=("msys2-keyring")
-packages+=("msys2-launcher-git")
-packages+=("pacman-mirrors")
-packages+=("which")
-packages+=("pacman")
-packages+=("pkgfile")
-packages+=("wget")
-packages+=("pactoys-git")
-packages+=("pax-git")
-packages+=("rebase")
-packages+=("time")
-packages+=("ttyrec")
-packages+=("tzcode")
-
-packages+=("binutils")
-
-packages+=("gdbm")
-packages+=("python2")
-packages+=("libgcrypt")
-
-packages+=("libxslt")
-packages+=("docbook-xml")
-packages+=("docbook-xsl")
-packages+=("asciidoc")
-packages+=("diffutils")
-packages+=("autoconf")
-
-packages+=("autoconf2.13")
-packages+=("gc")
-packages+=("libunistring")
-packages+=("guile")
-packages+=("db")
-packages+=("perl")
-packages+=("automake1.6")
-packages+=("automake1.7")
-packages+=("automake1.8")
-packages+=("automake1.9")
-packages+=("automake1.10")
-packages+=("automake1.11")
-packages+=("automake1.12")
-packages+=("automake1.13")
-packages+=("automake1.14")
-packages+=("automake1.15")
-packages+=("automake-wrapper")
-
-packages+=("bison")
-packages+=("diffstat")
-packages+=("dos2unix")
-packages+=("expat")
-
-packages+=("gdb")
-packages+=("libiconv")
-packages+=("gperf")
-packages+=("groff")
-packages+=("perl-Locale-Gettext")
-packages+=("help2man")
-packages+=("perl-XML-Parser")
-packages+=("intltool")
-packages+=("lemon")
-packages+=("tar")
-packages+=("unrar")
-packages+=("make")
-packages+=("libpipeline")
-packages+=("man-db")
-packages+=("pactoys-git")
-packages+=("patchutils")
-packages+=("glib2")
-packages+=("pkg-config")
-packages+=("quilt")
-packages+=("rcs")
-packages+=("scons")
-packages+=("swig")
-packages+=("texinfo")
-packages+=("ttyrec")
-packages+=("perl-YAML-Syck")
-packages+=("perl-Module-Build")
-packages+=("xmlto")
-packages+=("libtool")
-
+for package in *; do
+    if [[ -d $package ]]; then
+	   packages+=("$package")
+	fi
+    unset package
+done
+cd ${TOP_DIR}
 message 'Processing changes' "${commits[@]}"
 
 [[ $ADD_DEPEND_PKG == yes ]] && {
@@ -244,17 +120,33 @@ message 'Building packages' "${packages[@]}"
 	success 'Simulate only'
 }
 
+SKIPPING=no
+
 for package in "${packages[@]}"; do
+    SKIPPING=no
+    if grep "${package} finished" ${TOP_DIR}/${LOGFILE}; then
+	message 'skipping'
+	SKIPPING=yes
+	fi
+	[[ $package == bash ]] && {
+	SKIPPING=yes
+	}
+	[[ $SKIPPING == no ]] && {
+	message 'installing'
 	execute 'Delete pkg' rm -rf "${PKGROOT}/${package}"/pkg
     execute 'Delete src' rm -rf "${PKGROOT}/${package}"/src
 
 	deploy_enabled &&  mv "${PKGROOT}/${package}"/*.pkg.tar.xz $TOP_DIR/artifacts
-    execute 'Building binary' makepkg --log --force --noprogressbar --skippgpcheck --nocheck --syncdeps --cleanbuild
+    execute 'Building binary' makepkg --log --noconfirm --force --noprogressbar --skippgpcheck --nocheck --syncdeps --cleanbuild
     execute 'Building source' makepkg --noconfirm --force --noprogressbar --skippgpcheck --allsource 
     execute 'Installing' pacman --noprogressbar --noconfirm --upgrade *.pkg.tar.xz
     deploy_enabled && mv "${PKGROOT}/${package}"/*.pkg.tar.xz $TOP_DIR/artifacts
     deploy_enabled && mv "${PKGROOT}/${package}"/*.src.tar.gz $TOP_DIR/artifacts_src
+	echo "${package} finished" | adddate >> $TOP_DIR/${LOGFILE}
+
+	}
     unset package
+	
 done
 
 # Deploy
