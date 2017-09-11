@@ -16,7 +16,12 @@ mkdir artifacts
 #list_commits  || failure 'Could not detect added commits'
 #list_packages || failure 'Could not detect changed files'
 
-pacman --noprogressbar --noconfirm -R $(pacman -Qq | grep -vxe "$(cat $TOP_DIR/pkg_list_appveyor.txt)")
+
+pacman --noprogressbar --noconfirm -R $(pacman -Qq | grep -vxe "$(cat $TOP_DIR/pkg_list_base.txt)")
+pacman -Syu --noprogressbar --noconfirm 
+pacman -S --noprogressbar --noconfirm git
+
+pacman -S --noprogressbar --noconfirm base-devel
 
 git_config user.email 'ci@msys2.org'
 git_config user.name  'MSYS2 Continuous Integration'
