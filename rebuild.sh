@@ -12,8 +12,8 @@ cd "$(dirname "$0")"
 source $TOP_DIR/rebuild-library.sh
 deploy_enabled && mkdir -p artifacts
 deploy_enabled && mkdir -p artifacts_src
-git_config user.email 'ci@msys2.org'
-git_config user.name  'MSYS2 Continuous Integration'
+#git_config user.email 'ci@msys2.org'
+#git_config user.name  'MSYS2 Continuous Integration'
 #git remote add upstream 'https://github.com/Alexpux/MINGW-packages'
 #git fetch --quiet upstream
 

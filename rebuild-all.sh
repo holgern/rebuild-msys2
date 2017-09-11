@@ -12,8 +12,8 @@ cd "$(dirname "$0")"
 source $TOP_DIR/rebuild-library.sh
 deploy_enabled && mkdir -p artifacts
 deploy_enabled && mkdir -p artifacts_src
-#git_config user.email 'ci@msys2.org'
-#git_config user.name  'MSYS2 Continuous Integration'
+git_config user.email 'ci@msys2.org'
+git_config user.name  'MSYS2 Continuous Integration'
 #git remote add upstream 'https://github.com/Alexpux/MINGW-packages'
 #git fetch --quiet upstream
 
@@ -121,33 +121,55 @@ message 'Building packages' "${packages[@]}"
 }
 
 SKIPPING=no
-
+ERROR=no
+cd "${PKGROOT}"
 for package in "${packages[@]}"; do
     SKIPPING=no
+	ERROR=no
     if grep "${package} finished" ${TOP_DIR}/${LOGFILE}; then
-	message 'skipping'
-	SKIPPING=yes
+		message 'skipping'
+		SKIPPING=yes
+	fi
+	if grep "${package} failed" ${TOP_DIR}/${LOGFILE}; then
+		message 'skipping'
+		SKIPPING=yes
 	fi
 	[[ $package == bash ]] && {
-	SKIPPING=yes
+		SKIPPING=yes
+		echo "skipping ${package}" | adddate >> $TOP_DIR/${LOGFILE}
 	}
+	
 	[[ $SKIPPING == no ]] && {
-	message 'installing'
-	execute 'Delete pkg' rm -rf "${PKGROOT}/${package}"/pkg
-    execute 'Delete src' rm -rf "${PKGROOT}/${package}"/src
+		message 'installing'
+		execute 'Delete pkg' rm -rf "${PKGROOT}/${package}"/pkg
+		execute 'Delete src' rm -rf "${PKGROOT}/${package}"/src
 
-	deploy_enabled &&  mv "${PKGROOT}/${package}"/*.pkg.tar.xz $TOP_DIR/artifacts
-    execute 'Building binary' makepkg --log --noconfirm --force --noprogressbar --skippgpcheck --nocheck --syncdeps --cleanbuild
-    execute 'Building source' makepkg --noconfirm --force --noprogressbar --skippgpcheck --allsource 
-    execute 'Installing' pacman --noprogressbar --noconfirm --upgrade *.pkg.tar.xz
-    deploy_enabled && mv "${PKGROOT}/${package}"/*.pkg.tar.xz $TOP_DIR/artifacts
-    deploy_enabled && mv "${PKGROOT}/${package}"/*.src.tar.gz $TOP_DIR/artifacts_src
-	echo "${package} finished" | adddate >> $TOP_DIR/${LOGFILE}
+		deploy_enabled &&  mv "${PKGROOT}/${package}"/*.pkg.tar.xz $TOP_DIR/artifacts
 
+		set +Ee
+		cd "${PKGROOT}/${package}"
+		makepkg --log --noconfirm --force --noprogressbar --skippgpcheck --nocheck --syncdeps --cleanbuild || ERROR=yes
+		[[ $ERROR == no ]] && {
+			makepkg --noconfirm --force --noprogressbar --skippgpcheck --allsource || ERROR=yes
+		}
+			[[ $ERROR == no ]] && {
+			pacman --noprogressbar --noconfirm --upgrade *.pkg.tar.xz || ERROR=yes
+		}
+		cd "${PKGROOT}"
+
+
+		[[ $ERROR == no ]] && {
+			deploy_enabled && mv "${PKGROOT}/${package}"/*.pkg.tar.xz $TOP_DIR/artifacts
+			deploy_enabled && mv "${PKGROOT}/${package}"/*.src.tar.gz $TOP_DIR/artifacts_src
+			echo "${package} finished" | adddate >> $TOP_DIR/${LOGFILE}
+		} || {
+			echo "${package} failed" | adddate >> $TOP_DIR/${LOGFILE}
+		}
 	}
     unset package
 	
 done
+cd ${TOP_DIR}
 
 # Deploy
 #deploy_enabled && cd artifacts || success 'All packages built successfully'
